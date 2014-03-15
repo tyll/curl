@@ -4384,12 +4384,22 @@ static CURLcode parse_proxy(struct SessionHandle *data,
   /* start scanning for port number at this point */
   portptr = proxyptr;
 
-  /* detect and extract RFC2732-style IPv6-addresses */
+  /* detect and extract RFC6874-style IPv6-addresses */
   if(*proxyptr == '[') {
     char *ptr = ++proxyptr; /* advance beyond the initial bracket */
-    while(*ptr && (ISXDIGIT(*ptr) || (*ptr == ':') || (*ptr == '%') ||
-                   (*ptr == '.')))
+    while(*ptr && (ISXDIGIT(*ptr) || (*ptr == ':') || (*ptr == '.')))
       ptr++;
+    if(*ptr == '%') {
+      /* There might be a zone identifier */
+      if (strncmp("%25", ptr, 3) != 0) {
+        infof(data, "Please URL encode %% as %%25, see RFC 6874.\n");
+      }
+      ptr++;
+      /* Allow unresered characters as defined in RFC 3986 */
+      while(*ptr && (ISALPHA(*ptr) || ISXDIGIT(*ptr) || (*ptr == '-') ||
+                     (*ptr == '.') || (*ptr == '_') || (*ptr == '~')))
+        ptr++;
+    }
     if(*ptr == ']')
       /* yeps, it ended nicely with a bracket as well */
       *ptr++ = 0;
