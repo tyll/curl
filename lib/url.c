@@ -3965,8 +3965,36 @@ static CURLcode parseurlandfillconn(struct SessionHandle *data,
           /* Don't honour a scope given in a Location: header */
           conn->scope = (unsigned int)scope;
       }
-      else
-        infof(data, "Invalid IPv6 address format\n");
+      else {
+#ifdef HAVE_NET_IF_H
+        char ifname[IFNAMSIZ + 2];
+        size_t square_bracket;
+        unsigned int scope = 0;
+        strncpy(ifname, percent + 3, IFNAMSIZ + 2);
+        /* Ensure nullbyte termination */
+        ifname[IFNAMSIZ + 1] = '\0';
+        square_bracket = strcspn(ifname, "]");
+        if (square_bracket > 0) {
+          /* Remove ']' */
+          ifname[square_bracket] = '\0';
+          scope = if_nametoindex(ifname);
+        }
+        if (scope > 0) {
+          /* Remove zone identifier from hostname */
+          memmove(percent,
+                  percent + 3 + strlen(ifname),
+                  3 + strlen(ifname));
+          if(!data->state.this_is_a_follow)
+            /* Don't honour a scope given in a Location: header */
+            conn->scope = scope;
+        }
+        else {
+#endif
+          infof(data, "Invalid IPv6 address format\n");
+#ifdef HAVE_NET_IF_H
+        }
+#endif
+      }
     }
   }
 
