@@ -3950,9 +3950,9 @@ static CURLcode parseurlandfillconn(struct SessionHandle *data,
   if(result != CURLE_OK)
     return result;
 
-  if(conn->host.name[0] == '[') {
+  if(conn->host.name[0] == '[' && !data->state.this_is_a_follow) {
     /* This looks like an IPv6 address literal.  See if there is an address
-       scope.  */
+       scope if there is no location header */
     char *percent = strstr (conn->host.name, "%25");
     if(percent) {
       char *endp;
@@ -3961,9 +3961,7 @@ static CURLcode parseurlandfillconn(struct SessionHandle *data,
         /* The address scope was well formed.  Knock it out of the
            hostname. */
         memmove(percent, endp, strlen(endp)+1);
-        if(!data->state.this_is_a_follow)
-          /* Don't honour a scope given in a Location: header */
-          conn->scope = (unsigned int)scope;
+        conn->scope = (unsigned int)scope;
       }
       else {
 #ifdef HAVE_NET_IF_H
@@ -3996,9 +3994,7 @@ static CURLcode parseurlandfillconn(struct SessionHandle *data,
             memmove(percent,
                     percent + identifier_offset + strlen(ifname),
                     identifier_offset + strlen(ifname));
-            if(!data->state.this_is_a_follow)
-              /* Don't honour a scope given in a Location: header */
-              conn->scope = scope;
+            conn->scope = scope;
           }
           else {
 #endif /* HAVE_NET_IF_H */
