@@ -3970,32 +3970,41 @@ static CURLcode parseurlandfillconn(struct SessionHandle *data,
         char ifname[IFNAMSIZ + 2];
         size_t square_bracket;
         unsigned int scope = 0;
-        strncpy(ifname, percent + 3, IFNAMSIZ + 2);
-        /* Ensure nullbyte termination */
-        ifname[IFNAMSIZ + 1] = '\0';
-        square_bracket = strcspn(ifname, "]");
-        if (square_bracket > 0) {
-          /* Remove ']' */
-          ifname[square_bracket] = '\0';
-          scope = if_nametoindex(ifname);
-          if (scope == 0) {
-              infof(data, "Invalid network interface: %s: %s", ifname,
-                    strerror(errno));
+        char *percent = strstr(conn->host.name, "%");
+        unsigned int identifier_offset = 3;
+        if (percent) {
+          if (strncmp("%25", percent, 3) != 0) {
+            infof(data,
+                  "Please URL encode %% as %%25, see RFC 6874.\n");
+            identifier_offset = 1;
           }
-        }
-        if (scope > 0) {
-          /* Remove zone identifier from hostname */
-          memmove(percent,
-                  percent + 3 + strlen(ifname),
-                  3 + strlen(ifname));
-          if(!data->state.this_is_a_follow)
-            /* Don't honour a scope given in a Location: header */
-            conn->scope = scope;
-        }
-        else {
+          strncpy(ifname, percent + identifier_offset, IFNAMSIZ + 2);
+          /* Ensure nullbyte termination */
+          ifname[IFNAMSIZ + 1] = '\0';
+          square_bracket = strcspn(ifname, "]");
+          if (square_bracket > 0) {
+            /* Remove ']' */
+            ifname[square_bracket] = '\0';
+            scope = if_nametoindex(ifname);
+            if (scope == 0) {
+                infof(data, "Invalid network interface: %s: %s", ifname,
+                      strerror(errno));
+            }
+          }
+          if (scope > 0) {
+            /* Remove zone identifier from hostname */
+            memmove(percent,
+                    percent + identifier_offset + strlen(ifname),
+                    identifier_offset + strlen(ifname));
+            if(!data->state.this_is_a_follow)
+              /* Don't honour a scope given in a Location: header */
+              conn->scope = scope;
+          }
+          else {
 #endif
-          infof(data, "Invalid IPv6 address format\n");
+            infof(data, "Invalid IPv6 address format\n");
 #ifdef HAVE_NET_IF_H
+          }
         }
 #endif
       }
