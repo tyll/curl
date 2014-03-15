@@ -4001,12 +4001,12 @@ static CURLcode parseurlandfillconn(struct SessionHandle *data,
               conn->scope = scope;
           }
           else {
-#endif
+#endif /* HAVE_NET_IF_H */
             infof(data, "Invalid IPv6 address format\n");
 #ifdef HAVE_NET_IF_H
           }
         }
-#endif
+#endif /* HAVE_NET_IF_H */
       }
     }
   }
