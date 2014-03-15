@@ -3987,7 +3987,7 @@ static CURLcode parseurlandfillconn(struct SessionHandle *data,
             ifname[square_bracket] = '\0';
             scope = if_nametoindex(ifname);
             if (scope == 0) {
-                infof(data, "Invalid network interface: %s: %s", ifname,
+                infof(data, "Invalid network interface: %s; %s\n", ifname,
                       strerror(errno));
             }
           }
