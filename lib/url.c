@@ -3953,10 +3953,16 @@ static CURLcode parseurlandfillconn(struct SessionHandle *data,
   if(conn->host.name[0] == '[' && !data->state.this_is_a_follow) {
     /* This looks like an IPv6 address literal.  See if there is an address
        scope if there is no location header */
-    char *percent = strstr (conn->host.name, "%25");
+    char *percent = strstr (conn->host.name, "%");
     if(percent) {
+      unsigned int identifier_offset = 3;
       char *endp;
-      unsigned long scope = strtoul (percent + 3, &endp, 10);
+      if (strncmp("%25", percent, 3) != 0) {
+        infof(data,
+              "Please URL encode %% as %%25, see RFC 6874.\n");
+        identifier_offset = 1;
+      }
+      unsigned long scope = strtoul(percent + identifier_offset, &endp, 10);
       if(*endp == ']') {
         /* The address scope was well formed.  Knock it out of the
            hostname. */
@@ -3964,43 +3970,35 @@ static CURLcode parseurlandfillconn(struct SessionHandle *data,
         conn->scope = (unsigned int)scope;
       }
       else {
+        /* Zone identifier is not numeric */
 #ifdef HAVE_NET_IF_H
         char ifname[IFNAMSIZ + 2];
         size_t square_bracket;
         unsigned int scope = 0;
-        char *percent = strstr(conn->host.name, "%");
-        unsigned int identifier_offset = 3;
-        if (percent) {
-          if (strncmp("%25", percent, 3) != 0) {
-            infof(data,
-                  "Please URL encode %% as %%25, see RFC 6874.\n");
-            identifier_offset = 1;
+        strncpy(ifname, percent + identifier_offset, IFNAMSIZ + 2);
+        /* Ensure nullbyte termination */
+        ifname[IFNAMSIZ + 1] = '\0';
+        square_bracket = strcspn(ifname, "]");
+        if (square_bracket > 0) {
+          /* Remove ']' */
+          ifname[square_bracket] = '\0';
+          scope = if_nametoindex(ifname);
+          if (scope == 0) {
+            infof(data, "Invalid network interface: %s; %s\n", ifname,
+                strerror(errno));
           }
-          strncpy(ifname, percent + identifier_offset, IFNAMSIZ + 2);
-          /* Ensure nullbyte termination */
-          ifname[IFNAMSIZ + 1] = '\0';
-          square_bracket = strcspn(ifname, "]");
-          if (square_bracket > 0) {
-            /* Remove ']' */
-            ifname[square_bracket] = '\0';
-            scope = if_nametoindex(ifname);
-            if (scope == 0) {
-                infof(data, "Invalid network interface: %s; %s\n", ifname,
-                      strerror(errno));
-            }
-          }
-          if (scope > 0) {
-            /* Remove zone identifier from hostname */
-            memmove(percent,
-                    percent + identifier_offset + strlen(ifname),
-                    identifier_offset + strlen(ifname));
-            conn->scope = scope;
-          }
-          else {
+        }
+        if (scope > 0) {
+          /* Remove zone identifier from hostname */
+          memmove(percent,
+              percent + identifier_offset + strlen(ifname),
+              identifier_offset + strlen(ifname));
+          conn->scope = scope;
+        }
+        else {
 #endif /* HAVE_NET_IF_H */
-            infof(data, "Invalid IPv6 address format\n");
+          infof(data, "Invalid IPv6 address format\n");
 #ifdef HAVE_NET_IF_H
-          }
         }
 #endif /* HAVE_NET_IF_H */
       }
